@@ -1,375 +1,8 @@
-// import 'dart:convert';
-//
-// import 'package:flutter/material.dart';
-// import 'package:flutter/services.dart';
-// import 'package:r/register.dart';
-// import 'package:web_socket_channel/web_socket_channel.dart';
-//
-// class Login extends StatefulWidget {
-//   @override
-//   LoginState createState() => LoginState();
-// }
-//
-// class LoginState  extends State<Login> {
-//
-//   var usernameController = TextEditingController();
-//   var passwordController = TextEditingController();
-//   WebSocketChannel? channel;
-//   bool isLoading = false;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     channel = WebSocketChannel.connect(Uri.parse('wss://echo.websocket.org'));
-//
-//
-//     channel!.stream.listen(
-//           (message) {
-//         // Show server response in SnackBar
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('Server response: $message')),
-//         );
-//         print('sent to server');
-//       },
-//       onError: (error) {
-//         // Handle errors (e.g., connection issues)
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('WebSocket error: $error')),
-//         );
-//       },
-//       onDone: () {
-//         // Handle connection closure
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(content: Text('WebSocket connection closed')),
-//         );
-//       },
-//     );
-//   }
-//
-//   void login() {
-//
-//     var data = {
-//       'method': 'POST',
-//       'route': '/user/login/',
-//       'payload': {
-//         'username': usernameController.text,
-//         'password': passwordController.text,
-//       }
-//     };
-//
-//     var jdata = jsonEncode(data);
-//
-//     try {
-//       channel!.sink.add(jdata);
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(content: Text('Sent username/password to Server'))
-//       );
-//     } catch (e) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(content: Text('Error: $e'))
-//       );
-//     }
-//   }
-//
-//   @override
-//   void dispose() {
-//     channel?.sink.close();
-//     usernameController.dispose();
-//     passwordController.dispose();
-//     super.dispose();
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: appBar(),
-//       body: SingleChildScrollView(
-//         child: Column(
-//           children: [
-//             SizedBox(height: 125),
-//             TextField(
-//               controller: usernameController,
-//               decoration: InputDecoration(
-//                   labelText: 'Username',
-//                   hintText: 'Enter your Username',
-//                   filled: true,
-//                   fillColor: Colors.white,
-//                   border: OutlineInputBorder(
-//                       borderRadius: BorderRadius.circular(20),
-//                       borderSide: BorderSide.none
-//                   )
-//               ),
-//             ),
-//             SizedBox(height: 50),
-//             TextField(
-//               controller: passwordController,
-//               obscureText: true,
-//               decoration: InputDecoration(
-//                   labelText: 'Password',
-//                   hintText: 'Enter your password',
-//                   filled: true,
-//                   fillColor: Colors.white,
-//                   border: OutlineInputBorder(
-//                       borderRadius: BorderRadius.circular(20),
-//                       borderSide: BorderSide.none
-//                   )
-//               ),
-//             ),
-//             SizedBox(height: 50),
-//             GestureDetector(
-//               onTap: () {
-//                 Navigator.push(
-//                   context,
-//                   MaterialPageRoute(builder: (context) => register()), // Navigate to RegisterPage
-//                 );
-//               },
-//               child: Text(
-//                 'Register?',
-//                 style: TextStyle(
-//                   fontSize: 12,
-//                   fontWeight: FontWeight.bold,
-//                   color: Colors.blue,
-//                   decoration: TextDecoration.underline, // Adds an underline effect
-//                 ),
-//               ),
-//             ),
-//             SizedBox(height: 50),
-//             OutlinedButton(
-//               onPressed: () {
-//                 print('OutlinedButton pressed!');
-//                 login();
-//               },
-//               child: Text('Login'),
-//             )
-//           ],
-//         )
-//       )
-//     );
-//   }
-// }
-//
-// AppBar appBar() {
-//   return AppBar(
-//     title: Text('Xarin'),
-//     centerTitle: true,
-//   );
-// }
-
-// import 'dart:convert';
-//
-// import 'package:flutter/material.dart';
-// import 'package:flutter/services.dart';
-// import 'package:r/register.dart';
-// import 'package:web_socket_channel/web_socket_channel.dart';
-//
-// class Login extends StatefulWidget {
-//   @override
-//   LoginState createState() => LoginState();
-// }
-//
-// class LoginState extends State<Login> {
-//   var usernameController = TextEditingController();
-//   var passwordController = TextEditingController();
-//   WebSocketChannel? channel;
-//   bool isLoading = false;
-//
-//   @override
-//   void initState() {
-//     super.initState();
-//     channel = WebSocketChannel.connect(Uri.parse('wss://echo.websocket.org'));
-//
-//     channel!.stream.listen(
-//           (message) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(
-//             content: Text('Server response: $message', style: TextStyle(color: Colors.white)),
-//             backgroundColor: Colors.grey[800],
-//           ),
-//         );
-//         print('sent to server');
-//       },
-//       onError: (error) {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(
-//             content: Text('WebSocket error: $error', style: TextStyle(color: Colors.white)),
-//             backgroundColor: Colors.grey[800],
-//           ),
-//         );
-//       },
-//       onDone: () {
-//         ScaffoldMessenger.of(context).showSnackBar(
-//           SnackBar(
-//             content: Text('WebSocket connection closed', style: TextStyle(color: Colors.white)),
-//             backgroundColor: Colors.grey[800],
-//           ),
-//         );
-//       },
-//     );
-//   }
-//
-//   void login() {
-//     var data = {
-//       'method': 'POST',
-//       'route': '/user/login/',
-//       'payload': {
-//         'username': usernameController.text,
-//         'password': passwordController.text,
-//       }
-//     };
-//
-//     var jdata = jsonEncode(data);
-//
-//     try {
-//       channel!.sink.add(jdata);
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: Text('Sent username/password to Server', style: TextStyle(color: Colors.white)),
-//           backgroundColor: Colors.grey[800],
-//         ),
-//       );
-//     } catch (e) {
-//       ScaffoldMessenger.of(context).showSnackBar(
-//         SnackBar(
-//           content: Text('Error: $e', style: TextStyle(color: Colors.white)),
-//           backgroundColor: Colors.grey[800],
-//         ),
-//       );
-//     }
-//   }
-//
-//   @override
-//   void dispose() {
-//     channel?.sink.close();
-//     usernameController.dispose();
-//     passwordController.dispose();
-//     super.dispose();
-//   }
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: Colors.grey[900],
-//       appBar: appBar(),
-//       body: SingleChildScrollView(
-//         child: Padding(
-//           padding: EdgeInsets.symmetric(horizontal: 32),
-//           child: Column(
-//             mainAxisAlignment: MainAxisAlignment.center,
-//             children: [
-//               SizedBox(height: 50),
-//               Icon(Icons.lock, size: 100, color: Colors.white), // Placeholder for logo
-//               SizedBox(height: 50),
-//               Container(
-//                 decoration: BoxDecoration(
-//                   color: Colors.grey[800],
-//                   borderRadius: BorderRadius.circular(20),
-//                   boxShadow: [
-//                     BoxShadow(
-//                       color: Colors.black26,
-//                       blurRadius: 10,
-//                       offset: Offset(0, 5),
-//                     ),
-//                   ],
-//                 ),
-//                 child: TextField(
-//                   controller: usernameController,
-//                   style: TextStyle(color: Colors.white),
-//                   decoration: InputDecoration(
-//                     labelText: 'Username',
-//                     hintText: 'Enter your Username',
-//                     labelStyle: TextStyle(color: Colors.white),
-//                     hintStyle: TextStyle(color: Colors.white70),
-//                     prefixIcon: Icon(Icons.person, color: Colors.white),
-//                     border: InputBorder.none,
-//                     contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-//                   ),
-//                 ),
-//               ),
-//               SizedBox(height: 20),
-//               Container(
-//                 decoration: BoxDecoration(
-//                   color: Colors.grey[800],
-//                   borderRadius: BorderRadius.circular(20),
-//                   boxShadow: [
-//                     BoxShadow(
-//                       color: Colors.black26,
-//                       blurRadius: 10,
-//                       offset: Offset(0, 5),
-//                     ),
-//                   ],
-//                 ),
-//                 child: TextField(
-//                   controller: passwordController,
-//                   obscureText: true,
-//                   style: TextStyle(color: Colors.white),
-//                   decoration: InputDecoration(
-//                     labelText: 'Password',
-//                     hintText: 'Enter your password',
-//                     labelStyle: TextStyle(color: Colors.white),
-//                     hintStyle: TextStyle(color: Colors.white70),
-//                     prefixIcon: Icon(Icons.lock, color: Colors.white),
-//                     border: InputBorder.none,
-//                     contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-//                   ),
-//                 ),
-//               ),
-//               SizedBox(height: 20),
-//               GestureDetector(
-//                 onTap: () {
-//                   Navigator.push(
-//                     context,
-//                     MaterialPageRoute(builder: (context) => register()),
-//                   );
-//                 },
-//                 child: Text(
-//                   'Register?',
-//                   style: TextStyle(
-//                     fontSize: 16,
-//                     fontWeight: FontWeight.bold,
-//                     color: Colors.white,
-//                     decoration: TextDecoration.underline,
-//                   ),
-//                 ),
-//               ),
-//               SizedBox(height: 20),
-//               ElevatedButton(
-//                 onPressed: () {
-//                   print('ElevatedButton pressed!');
-//                   login();
-//                 },
-//                 style: ElevatedButton.styleFrom(
-//                   backgroundColor: Colors.blueAccent,
-//                   foregroundColor: Colors.white,
-//                   shape: RoundedRectangleBorder(
-//                     borderRadius: BorderRadius.circular(20),
-//                   ),
-//                   padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
-//                 ),
-//                 child: Text('Login', style: TextStyle(fontSize: 16)),
-//               ),
-//               SizedBox(height: 50),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-//
-//   AppBar appBar() {
-//     return AppBar(
-//       title: Text('Xarin'),
-//       centerTitle: true,
-//       backgroundColor: Colors.black,
-//     );
-//   }
-// }
-
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:r/register.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 class Login extends StatefulWidget {
   @override
@@ -403,15 +36,29 @@ class LoginState extends State<Login> {
   }
 
   void connect() {
-    Socket.connect('192.168.0.149', 8888).then((s) {
+    Socket.connect('10.71.110.137', 8888).then((s) {
       channel = s;
       showBar('Connected to server');
 
       channel!.listen(
-        (data) {
+            (data) {
           var response = utf8.decode(data).trim();
-          showBar('Server response: $response');
           print('Received: $response');
+          showBar('Server response: $response');
+
+          try {
+            var jsonResponse = jsonDecode(response);
+            if (jsonResponse['status'] == 200) {
+              showBar('Login successful: ${jsonResponse['message']}');
+              saveCredentials(usernameController.text, passwordController.text);
+            } else if (jsonResponse['status'] == 401) {
+              showBar('Login failed: ${jsonResponse['message']}');
+            } else {
+              showBar('Unexpected response');
+            }
+          } catch (e) {
+            showBar('Error parsing response: $e');
+          }
         },
         onError: (error) {
           showBar('Socket error: $error');
@@ -425,6 +72,51 @@ class LoginState extends State<Login> {
       showBar('Failed to connect to socket: $e');
     });
   }
+
+  Future<void> saveCredentials(String username, String password) async {
+    try {
+      // Define a visible path in the Downloads folder
+      final directory = Directory('/storage/emulated/0/Download/xarin_credentials');
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+
+      final file = File('${directory.path}/credentials.json');
+      final credentials = {
+        'username': username,
+        'password': password,
+      };
+
+      await file.writeAsString(jsonEncode(credentials));
+      print('Credentials saved to ${file.path}');
+      showBar('Credentials saved to Downloads folder');
+    } catch (e) {
+      print('Failed to save credentials: $e');
+      showBar('Failed to save credentials');
+    }
+  }
+
+  /*Future<void> saveCredentials(String username, String password) async {
+    try {
+      final directory = Directory('${Directory.systemTemp.path}/xarin_credentials');
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
+      }
+
+      final file = File('${directory.path}/credentials.json');
+      final credentials = {
+        'username': username,
+        'password': password,
+      };
+
+      await file.writeAsString(jsonEncode(credentials));
+      print('Credentials saved to ${file.path}');
+      showBar('Credentials saved locally');
+    } catch (e) {
+      print('Failed to save credentials: $e');
+      showBar('Failed to save credentials');
+    }
+  }*/
 
   void login() {
     if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
