@@ -1,37 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:r/profile.dart';
 import 'package:carousel_slider/carousel_slider.dart';
-
-class HomePage extends StatefulWidget {
-  final String username;
-  const HomePage({Key? key, required this.username}) : super(key: key);
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
+import 'dart:typed_data';
 
 class _HomePageState extends State<HomePage> {
   String selectedPlaylist = "All";
-
-  final List<String> playlists = [
-    "All",
-    "Liked",
-    "Sonati",
-    "Rap",
-    "Pop",
-    "Rock"
-  ];
-
-  final List<String> carouselSongs = [
-    "eshgh_to",
-    "az_aval",
-    "aali_boodi",
-    "be_khodam",
-    "royaye_shirin",
-    "delbare_man",
-    "ashegh_shodam",
-  ];
+  List<String> playlists = ["All"];
+  List<String> carouselSongs = [];
 
   final Map<String, List<Map<String, String>>> playlistSongs = {
     "All": [
@@ -40,33 +18,241 @@ class _HomePageState extends State<HomePage> {
       {"title": "wercokr9ojeerjg", "artist": "salam", "duration": "7:00"},
       {"title": "werwerewrer", "artist": "reza sadeghi", "duration": "23:01"},
     ],
-    "Liked": [
-      {"title": "love_song", "artist": "ali", "duration": "3:15"},
-      {"title": "happy_day", "artist": "mohammad", "duration": "4:12"},
-    ],
-    "Rap": [
-      {"title": "rap_shah", "artist": "mc x", "duration": "2:45"},
-      {"title": "underground", "artist": "yasin", "duration": "3:40"},
-    ],
   };
+
+  String? _username;
+  String? _password;
+
+  @override
+  void initState() {
+    super.initState();
+    _initUserAndLoad();
+  }
+
+  void showBar(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: Colors.blue[900],
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  /// Load credentials then request data
+  Future<void> _initUserAndLoad() async {
+    final creds = await _loadCredentials();
+    if (creds != null) {
+      _username = creds['username'];
+      _password = creds['password'];
+
+      _requestPlaylists();
+      _requestCarouselSongs();
+    } else {
+      showBar("Credentials not found!");
+    }
+  }
+
+  Future<Map<String, String>?> _loadCredentials() async {
+    try {
+      final directory = Directory('/storage/emulated/0/Download/xarin_credentials');
+      final file = File('${directory.path}/credentials.json');
+
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final data = jsonDecode(content);
+        if (data['username'] != null && data['password'] != null) {
+          return {"username": data['username'], "password": data['password']};
+        }
+      }
+    } catch (e) {
+      showBar("Error reading credentials: $e");
+    }
+    return null;
+  }
+
+  /// One-shot socket request
+  Future<Map<String, dynamic>?> _sendRequest(Map<String, dynamic> request) async {
+    try {
+      final socket = await Socket.connect('192.168.0.149', 8888, timeout: const Duration(seconds: 5));
+
+      socket.write(jsonEncode(request) + "\n");
+      await socket.flush();
+
+      final completer = Completer<Map<String, dynamic>?>();
+      socket.listen(
+            (data) {
+          final response = utf8.decode(data).trim();
+          try {
+            final jsonResponse = jsonDecode(response);
+            completer.complete(jsonResponse);
+          } catch (e) {
+            completer.completeError("Invalid JSON: $e");
+          } finally {
+            socket.destroy();
+          }
+        },
+        onError: (error) {
+          showBar("Socket error: $error");
+          completer.complete(null);
+          socket.destroy();
+        },
+        onDone: () {
+          socket.destroy();
+        },
+      );
+
+      return completer.future;
+    } catch (e) {
+      showBar("Failed to connect: $e");
+      return null;
+    }
+  }
+
+  /// Request playlists
+  Future<void> _requestPlaylists() async {
+    if (_username == null || _password == null) return;
+
+    final request = {
+      "route": "/playlist/",
+      "method": "post",
+      "payload": {"username": _username, "password": _password}
+    };
+
+    showBar("Requesting playlists...");
+    final response = await _sendRequest(request);
+
+    if (response == null) return;
+
+    if (response['status'] == 200 || response['playlists'] != null) {
+      final fetchedPlaylists = (response['playlists'] as List)
+          .map<String>((playlist) => playlist['name'] as String)
+          .toList();
+
+      setState(() {
+        playlists = fetchedPlaylists.isNotEmpty ? fetchedPlaylists : ["All", "Likes"];
+        selectedPlaylist = playlists.first;
+      });
+      showBar('Playlists loaded successfully');
+    } else {
+      showBar('Failed to load playlists: ${response['message']}');
+    }
+  }
+
+  /// Request carousel songs
+  /// Request carousel songs
+  Future<void> _requestCarouselSongs() async {
+    if (_username == null || _password == null) return;
+
+    final request = {
+      "route": "/audio/get/",
+      "method": "post",
+      "payload": {"username": _username, "password": _password}
+    };
+
+    showBar("Requesting carousel songs...");
+    final response = await _sendRequest(request);
+
+    if (response == null) return;
+
+    if (response['status'] == 200 && response['audios'] is List) {
+      final fetchedSongs = (response['audios'] as List)
+          .map<String>((audio) => audio['musicName'] as String)
+          .toList();
+
+      setState(() {
+        carouselSongs = fetchedSongs;
+      });
+      showBar('Carousel songs loaded');
+    } else {
+      showBar('Failed to load carousel: ${response['message'] ?? "invalid format"}');
+    }
+  }
+
 
   void _goToProfile() {
     Navigator.push(context, MaterialPageRoute(builder: (_) => ProfilePage()));
   }
 
   void _uploadMusic() {
-    // TODO: implement upload API call
+
   }
 
-  void _removePlaylist() {
-    // TODO: implement remove playlist API call
-  }
+  /*void _uploadMusic() async {
+    if (_username == null || _password == null) return;
 
+    try {
+      // Pick a single MP3 file
+      final filePath = await FlutterDocumentPicker.openDocument(
+        params: FlutterDocumentPickerParams(
+          allowedFileExtensions: ['mp3'],
+          allowedMimeTypes: ['audio/mpeg'],
+          allowMultiple: false,
+        ),
+      );
+
+      if (filePath == null || filePath.isEmpty) return;
+
+      final file = File(filePath);
+      if (!await file.exists()) {
+        showBar("File not found");
+        return;
+      }
+
+      final fileBytes = await file.readAsBytes();
+      final base64Str = base64Encode(fileBytes);
+
+      showBar("Uploading music...");
+
+      // Send upload request
+      final request = {
+        "route": "/audio/upload/",
+        "method": "post",
+        "payload": {
+          "username": _username,
+          "password": _password,
+          "base64": base64Str,
+        }
+      };
+
+      final response = await _sendRequest(request);
+
+      if (response == null || response['status'] != 200) {
+        showBar("Upload failed: ${response?['message'] ?? 'Unknown error'}");
+        return;
+      }
+
+      final uuid = response['uuid'];
+
+      // Copy to local musics directory
+      final saveDir = Directory('/storage/emulated/0/Download/xarin_credentials/musics/');
+      if (!await saveDir.exists()) await saveDir.create(recursive: true);
+
+      final savedFile = await file.copy('${saveDir.path}/${file.uri.pathSegments.last}');
+
+      // Update mapping.json
+      final mappingFile = File('/storage/emulated/0/Download/xarin_credentials/mapping.json');
+      if (!await mappingFile.exists()) {
+        await mappingFile.create(recursive: true);
+        await mappingFile.writeAsString(jsonEncode([]), flush: true);
+      }
+
+      final content = await mappingFile.readAsString();
+      List<dynamic> mappings = [];
+      if (content.isNotEmpty) mappings = jsonDecode(content);
+
+      mappings.add({"path": savedFile.path, "uuid": uuid});
+      await mappingFile.writeAsString(jsonEncode(mappings), flush: true);
+
+      showBar("Upload successful!");
+    } catch (e) {
+      showBar("Error picking or uploading file: $e");
+    }
+  }*/
+
+  void _removePlaylist() {}
   void _playMusic(Map<String, String> song) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => PlayMusic(song: song)),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => PlayMusic(song: song)));
   }
 
   @override
@@ -78,7 +264,7 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         backgroundColor: Colors.blue[900],
         elevation: 0,
-        automaticallyImplyLeading: false, // disable default leading slot
+        automaticallyImplyLeading: false,
         title: Row(
           children: [
             GestureDetector(
@@ -90,7 +276,7 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  widget.username,
+                  _username ?? "User",
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -102,15 +288,15 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const Spacer(),
-            Text(
+            const Text(
               "Xarin",
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 22,
                 color: Colors.white,
               ),
             ),
-            const Spacer(flex: 2), // pushes add button to far right
+            const Spacer(flex: 2),
           ],
         ),
         actions: [
@@ -125,7 +311,7 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Playlists row (clickable)
+            // Playlists row
             SizedBox(
               height: 45,
               child: ListView.builder(
@@ -142,8 +328,7 @@ class _HomePageState extends State<HomePage> {
                     },
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 6),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                       decoration: BoxDecoration(
                         color: isSelected ? Colors.blue[900] : Colors.white,
                         borderRadius: BorderRadius.circular(22),
@@ -153,7 +338,7 @@ class _HomePageState extends State<HomePage> {
                           BoxShadow(
                             color: Colors.blue.shade200,
                             blurRadius: 8,
-                            offset: Offset(0, 4),
+                            offset: const Offset(0, 4),
                           )
                         ]
                             : [],
@@ -173,21 +358,21 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 20),
-
-            // Big Rotating store songs (Carousel)
-            // Small centered sliding boxes (Carousel)
+            // Carousel
             SizedBox(
               height: 100,
-              child: CarouselSlider(
+              child: carouselSongs.isEmpty
+                  ? const Center(child: Text("No songs yet"))
+                  : CarouselSlider(
                 options: CarouselOptions(
                   height: 100,
                   autoPlay: true,
-                  autoPlayInterval: Duration(seconds: 2),
-                  autoPlayAnimationDuration: Duration(milliseconds: 800),
-                  viewportFraction: 0.35, // smaller width per item
+                  autoPlayInterval: const Duration(seconds: 2),
+                  autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                  viewportFraction: 0.35,
                   enlargeCenterPage: true,
                   enableInfiniteScroll: true,
-                  scrollPhysics: BouncingScrollPhysics(),
+                  scrollPhysics: const BouncingScrollPhysics(),
                 ),
                 items: carouselSongs.map((song) {
                   return Builder(
@@ -196,7 +381,7 @@ class _HomePageState extends State<HomePage> {
                         alignment: Alignment.center,
                         child: Container(
                           width: 120,
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [Colors.blue[400]!, Colors.blue[900]!],
@@ -204,7 +389,7 @@ class _HomePageState extends State<HomePage> {
                               end: Alignment.bottomRight,
                             ),
                             borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
+                            boxShadow: const [
                               BoxShadow(
                                 color: Colors.black26,
                                 blurRadius: 6,
@@ -216,15 +401,12 @@ class _HomePageState extends State<HomePage> {
                             child: Text(
                               song,
                               textAlign: TextAlign.center,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                                 shadows: [
-                                  Shadow(
-                                      color: Colors.black54,
-                                      blurRadius: 4,
-                                      offset: Offset(1, 1))
+                                  Shadow(color: Colors.black54, blurRadius: 4, offset: Offset(1, 1))
                                 ],
                               ),
                             ),
@@ -236,9 +418,7 @@ class _HomePageState extends State<HomePage> {
                 }).toList(),
               ),
             ),
-
             const SizedBox(height: 20),
-
             // Songs list
             Expanded(
               child: Container(
@@ -249,23 +429,19 @@ class _HomePageState extends State<HomePage> {
                     BoxShadow(
                       color: Colors.blue[900]!.withOpacity(0.1),
                       blurRadius: 8,
-                      offset: Offset(0, 4),
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Column(
                   children: [
-                    // Negative sign at top
                     Align(
                       alignment: Alignment.centerRight,
                       child: IconButton(
-                        icon: Icon(Icons.remove_circle,
-                            color: Colors.red[700], size: 28),
+                        icon: Icon(Icons.remove_circle, color: Colors.red[700], size: 28),
                         onPressed: _removePlaylist,
                       ),
                     ),
-
-                    // Songs list
                     Expanded(
                       child: ListView.separated(
                         itemCount: currentSongs.length,
@@ -281,27 +457,15 @@ class _HomePageState extends State<HomePage> {
                             onTap: () => _playMusic(song),
                             leading: CircleAvatar(
                               backgroundColor: Colors.blue[100],
-                              child: Icon(Icons.music_note,
-                                  color: Colors.blue[900]),
+                              child: Icon(Icons.music_note, color: Colors.blue[900]),
                             ),
                             title: Text(
                               song["title"]!,
-                              style: TextStyle(
-                                color: Colors.grey[900],
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style: TextStyle(color: Colors.grey[900], fontWeight: FontWeight.bold),
                             ),
-                            subtitle: Text(
-                              song["artist"]!,
-                              style: TextStyle(color: Colors.grey[600]),
-                            ),
-                            trailing: Text(
-                              song["duration"]!,
-                              style: TextStyle(
-                                color: Colors.blue[900],
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
+                            subtitle: Text(song["artist"]!, style: TextStyle(color: Colors.grey[600])),
+                            trailing: Text(song["duration"]!,
+                                style: TextStyle(color: Colors.blue[900], fontWeight: FontWeight.w500)),
                           );
                         },
                       ),
@@ -317,6 +481,13 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
+class HomePage extends StatefulWidget {
+  const HomePage({Key? key}) : super(key: key);
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
 class PlayMusic extends StatelessWidget {
   final Map<String, String> song;
   const PlayMusic({Key? key, required this.song}) : super(key: key);
@@ -324,9 +495,13 @@ class PlayMusic extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-            child: Text("Playing: ${song["title"]}",
-                style: TextStyle(color: Colors.white, fontSize: 24))));
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Text(
+          "Playing: ${song["title"]}",
+          style: const TextStyle(color: Colors.white, fontSize: 24),
+        ),
+      ),
+    );
   }
 }
