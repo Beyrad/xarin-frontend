@@ -1,10 +1,15 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:untitled1/login.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+// import profile.dart to access getCredentials
+import 'profile.dart';
+
 class MusicPlayerPage extends StatefulWidget {
   final List<Map<String, dynamic>> musics;
-  // Example: [{'id': 1, 'filename': 'mehrad_hidden_shayea_-_seyl.mp3'}]
 
   const MusicPlayerPage({super.key, required this.musics});
 
@@ -13,9 +18,23 @@ class MusicPlayerPage extends StatefulWidget {
 }
 
 class _MusicPlayerPageState extends State<MusicPlayerPage> {
+  void showBar(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: Colors.blue[900],
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+  Socket? channel;
+  String username="";
+  String email="";
+  String password="";
   late AudioPlayer _player;
   int _currentIndex = 0;
   bool _isPlaying = false;
+  bool _isLiked = false;
   bool _hasPermission = false;
 
   @override
@@ -33,10 +52,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
   }
 
   Future<bool> _requestAudioPermission() async {
-    // For Android 13+
     if (await Permission.audio.isGranted) return true;
-
-    // For Android 12 and lower
     if (await Permission.storage.isGranted) return true;
 
     var statuses = await [
@@ -47,12 +63,82 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     return statuses[Permission.audio]?.isGranted == true ||
         statuses[Permission.storage]?.isGranted == true;
   }
+  Future<void> is_liked(String musicId) async {
+    final directory = Directory('/storage/emulated/0/Download/xarin_credentials');
+    final file = File('${directory.path}/credentials.json');
 
+    if (await file.exists()) {
+      try {
+        final content = await file.readAsString();
+        final data = jsonDecode(content);
+        username = data['username'];
+        password = data['password'];
+
+        if (username.isNotEmpty && password.isNotEmpty) {
+          Socket.connect('192.168.1.104', 8888).then((s) {
+            channel = s;
+
+            channel!.listen(
+                  (data) {
+                final response = utf8.decode(data).trim();
+                debugPrint("is_liked response: $response");
+
+                try {
+                  final jsonResp = jsonDecode(response);
+                  if (jsonResp['status'] == 200) {
+                    setState(() => _isLiked = true);
+                  } else {
+                    setState(() => _isLiked = false);
+                  }
+                } catch (e) {
+                  debugPrint("Error parsing is_liked response: $e");
+                }
+
+                channel?.destroy();
+              },
+              onError: (err) {
+                debugPrint("Socket error in is_liked: $err");
+                channel?.destroy();
+              },
+              onDone: () {
+                channel?.destroy();
+              },
+            );
+
+            var req = {
+              'method': 'POST',
+              'route': '/is_liked/',
+              'payload': {
+                'username': username,
+                'password': password,
+                'uuid': musicId,
+              }
+            };
+
+            var jdata = jsonEncode(req) + '\n';
+            channel!.write(jdata);
+            channel!.flush();
+          }).catchError((e) {
+            debugPrint("Failed to connect for is_liked: $e");
+          });
+        } else {
+          _redirectToLogin();
+        }
+      } catch (e) {
+        showBar("Error reading credentials: $e");
+        _redirectToLogin();
+      }
+    } else {
+      _redirectToLogin();
+    }
+  }
   Future<void> _loadMusic() async {
     try {
       final filename = widget.musics[_currentIndex]['filename'] as String;
       final fullPath = "/storage/emulated/0/Download/xarin_musics/$filename";
-
+      final music = widget.musics[_currentIndex];
+      final musicId_ = music['id'] as String;
+      is_liked(musicId_);
       await _player.setFilePath(fullPath);
       setState(() => _isPlaying = false);
     } catch (e) {
@@ -90,6 +176,87 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       setState(() => _isPlaying = true);
     }
   }
+  void _redirectToLogin() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => Login()),
+    );
+  }
+  void connecttoadd(int playlist, String id) {
+    Socket.connect('192.168.1.104', 8888).then((s) {
+      channel = s;
+      showBar('Connected to server');
+
+      channel!.listen(
+            (data) {
+          var response = utf8.decode(data).trim();
+          print('Received wef: $response');
+        },
+        onError: (error) {
+          showBar('Socket error: $error');
+        },
+        onDone: () {
+          showBar('Socket connection closed');
+          channel?.destroy();
+        },
+      );
+
+      // Fetch user data with credentials
+      add_to_play_list(playlist, id);
+    }).catchError((e) {
+      showBar('Failed to connect to socket: $e');
+    });
+  }
+  void add_to_play_list(int playlist, String id) {
+    var data = {
+      'method': 'POST',
+      'route': '/playlist/' + playlist.toString() + '/add/',
+      'payload': {
+        'username': username,
+        'password': password,
+        'uuid' : id,
+      }
+    };
+
+    var jdata = jsonEncode(data) + '\n';
+
+    try {
+      print("Sending: $jdata");
+      channel!.write(jdata);
+      channel!.flush();
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+  // ---------------- NEW CODE ----------------
+  Future<void> like(String musicId) async {
+    debugPrint("rinned wef");
+      final directory = Directory('/storage/emulated/0/Download/xarin_credentials');
+      final file = File('${directory.path}/credentials.json');
+
+      if (await file.exists()) {
+        try {
+          final content = await file.readAsString();
+          final data = jsonDecode(content);
+          username = data['username'];
+          password = data['password'];
+
+          if (username != null && password != null) {
+            connecttoadd(1, musicId);
+          } else {
+            showBar("Invalid credentials file");
+            _redirectToLogin();
+          }
+        } catch (e) {
+          showBar("Error reading credentials: $e");
+          _redirectToLogin();
+        }
+      } else {
+        // No credentials, go back to login page
+        _redirectToLogin();
+      }
+  }
+  // ------------------------------------------
 
   @override
   void dispose() {
@@ -140,7 +307,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Album Art Placeholder
           Container(
             height: 250,
             width: 250,
@@ -155,7 +321,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
           ),
           const SizedBox(height: 30),
 
-          // Progress bar
           StreamBuilder<Duration?>(
             stream: _player.durationStream,
             builder: (context, snapshot) {
@@ -190,7 +355,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
 
           const SizedBox(height: 20),
 
-          // Controls
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -212,6 +376,25 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
               ),
             ],
           ),
+
+          const SizedBox(height: 30),
+
+          // ---------------- NEW BUTTON ----------------
+          ElevatedButton.icon(
+            icon: Icon(Icons.favorite,
+                color: _isLiked ? Colors.red : Colors.grey),
+            label: _isLiked ? const Text('liked') : const Text('like'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepPurple,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              final musicId = music['id'] as String;
+              like(musicId);
+              is_liked(musicId); // refresh after liking
+            },
+          ),
+          // --------------------------------------------
         ],
       ),
     );
