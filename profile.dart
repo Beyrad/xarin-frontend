@@ -21,7 +21,7 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    connect();
+    _checkCredentials();
   }
 
   void showBar(String text) {
@@ -34,7 +34,42 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void connect() {
+  /// Check if credentials.json exists
+  Future<void> _checkCredentials() async {
+    final directory = Directory('/storage/emulated/0/Download/xarin_credentials');
+    final file = File('${directory.path}/credentials.json');
+
+    if (await file.exists()) {
+      try {
+        final content = await file.readAsString();
+        final data = jsonDecode(content);
+        final username = data['username'];
+        final password = data['password'];
+
+        if (username != null && password != null) {
+          connect(username, password);
+        } else {
+          showBar("Invalid credentials file");
+          _redirectToLogin();
+        }
+      } catch (e) {
+        showBar("Error reading credentials: $e");
+        _redirectToLogin();
+      }
+    } else {
+      // No credentials, go back to login page
+      _redirectToLogin();
+    }
+  }
+
+  void _redirectToLogin() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => Login()),
+    );
+  }
+
+  void connect(String username, String password) {
     Socket.connect('192.168.1.104', 8888).then((s) {
       channel = s;
       showBar('Connected to server');
@@ -54,21 +89,20 @@ class _ProfilePageState extends State<ProfilePage> {
         },
       );
 
-      // Fetch user data immediately after connecting
-      getUserData();
+      // Fetch user data with credentials
+      getUserData(username, password);
     }).catchError((e) {
       showBar('Failed to connect to socket: $e');
     });
   }
 
-  void getUserData() {
-    // Replace these credentials with real ones or get from Login session
+  void getUserData(String username, String password) {
     var data = {
       'method': 'POST',
       'route': '/user/get_data/',
       'payload': {
-        'username': 'amin',
-        'password': 'wefwef1Q',
+        'username': username,
+        'password': password,
       }
     };
 
@@ -102,11 +136,20 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  void _logout() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => Login()),
-    );
+  void _logout() async {
+    try {
+      final directory = Directory('/storage/emulated/0/Download/xarin_credentials');
+      final file = File('${directory.path}/credentials.json');
+
+      if (await file.exists()) {
+        await file.delete();
+        showBar("Credentials deleted");
+      }
+    } catch (e) {
+      showBar("Error deleting credentials: $e");
+    }
+
+    _redirectToLogin();
   }
 
   @override
