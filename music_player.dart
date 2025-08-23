@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:audio_metadata_reader/audio_metadata_reader.dart'; // ✅ new
+import 'package:untitled1/constants.dart';
 
 // import profile.dart to access getCredentials
 import 'profile.dart';
@@ -82,7 +83,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         password = data['password'];
 
         if (username.isNotEmpty && password.isNotEmpty) {
-          Socket.connect('192.168.1.104', 8888).then((s) {
+          Socket.connect(host, port).then((s) {
             channel = s;
 
             channel!.listen(
@@ -143,7 +144,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
   Future<void> _loadMusic() async {
     try {
       final filename = widget.musics[_currentIndex]['filename'] as String;
-      final fullPath = "/storage/emulated/0/Download/xarin_musics/$filename";
+      final fullPath = "$filename";
       final music = widget.musics[_currentIndex];
       final musicId_ = music['id'] as String;
 
@@ -200,7 +201,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
   }
 
   void connecttoadd(int playlist, String id) {
-    Socket.connect('192.168.1.104', 8888).then((s) {
+    Socket.connect(host, port).then((s) {
       channel = s;
       showBar('Connected to server');
 
@@ -315,7 +316,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Colors.blue[900],
       ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -352,7 +353,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                   return Column(
                     children: [
                       Slider(
-                        activeColor: Colors.deepPurple,
+                        activeColor: Colors.blue[900],
                         min: 0,
                         max: duration.inSeconds.toDouble(),
                         value: position.inSeconds
@@ -385,7 +386,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
               ),
               IconButton(
                 iconSize: 64,
-                color: Colors.deepPurple,
+                color: Colors.blue[900],
                 icon: Icon(_isPlaying ? Icons.pause_circle : Icons.play_circle),
                 onPressed: _playPause,
               ),
@@ -404,7 +405,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
                 color: _isLiked ? Colors.red : Colors.grey),
             label: _isLiked ? const Text('liked') : const Text('like'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.deepPurple,
+              backgroundColor: Colors.blue[900],
               foregroundColor: Colors.white,
             ),
             onPressed: () {
