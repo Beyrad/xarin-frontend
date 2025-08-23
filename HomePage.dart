@@ -11,7 +11,9 @@ import 'package:file_selector/file_selector.dart';
 class _HomePageState extends State<HomePage> {
   String selectedPlaylist = "All";
   List<String> playlists = ["All"];
-  List<String> carouselSongs = [];
+
+  // Store musicName + uuid internally
+  List<Map<String, String>> carouselSongs = [];
 
   final Map<String, List<Map<String, String>>> playlistSongs = {
     "All": [
@@ -124,8 +126,7 @@ class _HomePageState extends State<HomePage> {
     final response = await _sendRequest(request);
 
     if (response == null) return;
-
-    if (response['status'] == 200 || response['playlists'] != null) {
+    if (response['status'] == 200 && response['playlists'] != null) {
       final fetchedPlaylists = (response['playlists'] as List)
           .map<String>((playlist) => playlist['name'] as String)
           .toList();
@@ -157,11 +158,16 @@ class _HomePageState extends State<HomePage> {
 
     if (response['status'] == 200 && response['audios'] is List) {
       final fetchedSongs = (response['audios'] as List)
-          .map<String>((audio) => audio['musicName'] as String)
+          .where((audio) =>
+      audio['musicName'] != null && audio['id'] != null)
+          .map<Map<String, String>>((audio) => {
+        "musicName": audio['musicName'] as String,
+        "uuid": audio['id'] as String, // note: use "id" from API
+      })
           .toList();
 
       setState(() {
-        carouselSongs = fetchedSongs;
+        carouselSongs = fetchedSongs; // assign Map with musicName + uuid
       });
       showBar('Carousel songs loaded');
     } else {
@@ -174,7 +180,55 @@ class _HomePageState extends State<HomePage> {
     Navigator.push(context, MaterialPageRoute(builder: (_) => ProfilePage()));
   }
 
-  /// Upload music using file_selector
+  Future<void> _onCarouselTap(String musicName) async {
+    final song =
+    carouselSongs.firstWhere((element) => element['musicName'] == musicName);
+    final uuid = song['uuid']!;
+
+    final dataFile = File('/storage/emulated/0/Download/xarin/xarin_data.json');
+    if (!await dataFile.exists()) {
+      await dataFile.create(recursive: true);
+      await dataFile.writeAsString(jsonEncode([]), flush: true);
+    }
+
+    final content = await dataFile.readAsString();
+    List<dynamic> mappings = [];
+    if (content.isNotEmpty) mappings = jsonDecode(content);
+
+    final existing = mappings.any((element) => element['uuid'] == uuid);
+    if (existing) {
+      showBar("File already downloaded!");
+      return;
+    }
+
+    final request = {
+      "route": "/audio/download/$uuid/",
+      "method": "post",
+      "payload": {"username": _username, "password": _password}
+    };
+    showBar("Downloading $musicName...");
+    final response = await _sendRequest(request);
+
+    if (response == null ||
+        response['status'] != 200 ||
+        response['base64'] == null) {
+      showBar("Download failed: ${response?['message'] ?? 'Unknown error'}");
+      return;
+    }
+
+    final bytes = base64Decode(response['base64']);
+    final saveDir = Directory('/storage/emulated/0/Download/xarin_musics/');
+    if (!await saveDir.exists()) await saveDir.create(recursive: true);
+
+    final savedFile = File('${saveDir.path}/$musicName.mp3');
+    await savedFile.writeAsBytes(bytes, flush: true);
+
+    mappings.add({"uuid": uuid, "path": savedFile.path});
+    await dataFile.writeAsString(jsonEncode(mappings), flush: true);
+
+    showBar("$musicName downloaded successfully!");
+  }
+
   Future<void> _uploadMusic() async {
     if (_username == null || _password == null) {
       showBar("Missing credentials");
@@ -195,20 +249,17 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      // Copy file to xarin_musics
       final saveDir = Directory('/storage/emulated/0/Download/xarin_musics/');
       if (!await saveDir.exists()) await saveDir.create(recursive: true);
 
       final savedFile =
       await file.copy('${saveDir.path}/${file.uri.pathSegments.last}');
 
-      // Encode to base64
       final fileBytes = await savedFile.readAsBytes();
       final base64Str = base64Encode(fileBytes);
 
       showBar("Uploading music...");
 
-      // Send to server
       final request = {
         "route": "/audio/upload/",
         "method": "post",
@@ -228,7 +279,6 @@ class _HomePageState extends State<HomePage> {
 
       final uuid = response['uuid'];
 
-      // Update xarin_data.json
       final dataFile = File('/storage/emulated/0/Download/xarin/xarin_data.json');
       if (!await dataFile.exists()) {
         await dataFile.create(recursive: true);
@@ -272,8 +322,7 @@ class _HomePageState extends State<HomePage> {
             GestureDetector(
               onTap: _goToProfile,
               child: Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(20),
@@ -314,7 +363,6 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Playlists row
             SizedBox(
               height: 45,
               child: ListView.builder(
@@ -331,8 +379,8 @@ class _HomePageState extends State<HomePage> {
                     },
                     child: Container(
                       margin: const EdgeInsets.symmetric(horizontal: 6),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 8),
+                      padding:
+                      const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                       decoration: BoxDecoration(
                         color: isSelected ? Colors.blue[900] : Colors.white,
                         borderRadius: BorderRadius.circular(22),
@@ -351,8 +399,7 @@ class _HomePageState extends State<HomePage> {
                         child: Text(
                           name,
                           style: TextStyle(
-                            color:
-                            isSelected ? Colors.white : Colors.blue[900],
+                            color: isSelected ? Colors.white : Colors.blue[900],
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -363,7 +410,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 20),
-            // Carousel
             SizedBox(
               height: 100,
               child: carouselSongs.isEmpty
@@ -381,46 +427,47 @@ class _HomePageState extends State<HomePage> {
                   scrollPhysics: const BouncingScrollPhysics(),
                 ),
                 items: carouselSongs.map((song) {
+                  final musicName = song['musicName']!;
                   return Builder(
                     builder: (BuildContext context) {
-                      return Align(
-                        alignment: Alignment.center,
-                        child: Container(
-                          width: 120,
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.blue[400]!,
-                                Colors.blue[900]!
+                      return GestureDetector(
+                        onTap: () => _onCarouselTap(musicName),
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: Container(
+                            width: 120,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.blue[400]!, Colors.blue[900]!],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 6,
+                                  offset: Offset(0, 3),
+                                )
                               ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 6,
-                                offset: Offset(0, 3),
-                              )
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              song,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                shadows: [
-                                  Shadow(
-                                      color: Colors.black54,
-                                      blurRadius: 4,
-                                      offset: Offset(1, 1))
-                                ],
+                            child: Center(
+                              child: Text(
+                                musicName,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  shadows: [
+                                    Shadow(
+                                        color: Colors.black54,
+                                        blurRadius: 4,
+                                        offset: Offset(1, 1))
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -432,7 +479,6 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 20),
-            // Songs list
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
@@ -471,8 +517,7 @@ class _HomePageState extends State<HomePage> {
                             onTap: () => _playMusic(song),
                             leading: CircleAvatar(
                               backgroundColor: Colors.blue[100],
-                              child: Icon(Icons.music_note,
-                                  color: Colors.blue[900]),
+                              child: Icon(Icons.music_note, color: Colors.blue[900]),
                             ),
                             title: Text(
                               song["title"]!,
