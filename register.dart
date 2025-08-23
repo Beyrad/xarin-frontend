@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:r/login.dart';
+import 'package:untitled1/login.dart';
+import 'package:untitled1/constants.dart';
 
 class Register extends StatefulWidget {
   @override
@@ -36,7 +37,7 @@ class RegisterState extends State<Register> {
   }
 
   void connect() {
-    Socket.connect('10.71.110.137', 8888).then((s) {
+    Socket.connect(host, port).then((s) {
       channel = s;
       showBar('Connected to server');
 
