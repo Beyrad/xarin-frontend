@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:r/register.dart';
+import 'package:untitled1/register.dart';
+import 'package:untitled1/constants.dart';
+import 'package:untitled1/HomePage.dart'; // <-- make sure this path is correct
 
 class Login extends StatefulWidget {
   @override
@@ -17,12 +19,32 @@ class LoginState extends State<Login> {
   @override
   void initState() {
     super.initState();
+    connect().then((_) {
+      _checkSavedCredentials(); // ✅ Check for saved credentials after socket connection
+    });
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    connect();
+  Future<void> _checkSavedCredentials() async {
+    try {
+      final file = File(
+          '/storage/emulated/0/Download/xarin_credentials/credentials.json');
+
+      if (await file.exists()) {
+        String content = await file.readAsString();
+        var jsonData = jsonDecode(content);
+
+        if (jsonData is Map &&
+            jsonData['username'] != null &&
+            jsonData['password'] != null) {
+          print("Found saved credentials for ${jsonData['username']}");
+
+          // ✅ Try logging in with saved credentials
+          _loginWithCredentials(jsonData['username'], jsonData['password']);
+        }
+      }
+    } catch (e) {
+      print("No valid saved credentials: $e");
+    }
   }
 
   void showBar(String text) {
@@ -35,22 +57,35 @@ class LoginState extends State<Login> {
     );
   }
 
-  void connect() {
-    Socket.connect('10.71.110.137', 8888).then((s) {
-      channel = s;
+  Future<void> connect() async {
+    try {
+      channel = await Socket.connect(host, port);
       showBar('Connected to server');
 
       channel!.listen(
             (data) {
           var response = utf8.decode(data).trim();
           print('Received: $response');
-          showBar('Server response: $response');
-
           try {
             var jsonResponse = jsonDecode(response);
+
             if (jsonResponse['status'] == 200) {
               showBar('Login successful: ${jsonResponse['message']}');
-              saveCredentials(usernameController.text, passwordController.text);
+
+              // Save credentials if user typed them manually
+              if (usernameController.text.isNotEmpty &&
+                  passwordController.text.isNotEmpty) {
+                saveCredentials(
+                    usernameController.text, passwordController.text);
+              }
+
+              // ✅ Redirect to HomePage after successful login
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => HomePage()),
+                );
+              });
             } else if (jsonResponse['status'] == 401) {
               showBar('Login failed: ${jsonResponse['message']}');
             } else {
@@ -68,15 +103,15 @@ class LoginState extends State<Login> {
           channel?.destroy();
         },
       );
-    }).catchError((e) {
+    } catch (e) {
       showBar('Failed to connect to socket: $e');
-    });
+    }
   }
 
   Future<void> saveCredentials(String username, String password) async {
     try {
-      // Define a visible path in the Downloads folder
-      final directory = Directory('/storage/emulated/0/Download/xarin_credentials');
+      final directory =
+      Directory('/storage/emulated/0/Download/xarin_credentials');
       if (!await directory.exists()) {
         await directory.create(recursive: true);
       }
@@ -96,50 +131,31 @@ class LoginState extends State<Login> {
     }
   }
 
-  /*Future<void> saveCredentials(String username, String password) async {
-    try {
-      final directory = Directory('${Directory.systemTemp.path}/xarin_credentials');
-      if (!await directory.exists()) {
-        await directory.create(recursive: true);
-      }
-
-      final file = File('${directory.path}/credentials.json');
-      final credentials = {
-        'username': username,
-        'password': password,
-      };
-
-      await file.writeAsString(jsonEncode(credentials));
-      print('Credentials saved to ${file.path}');
-      showBar('Credentials saved locally');
-    } catch (e) {
-      print('Failed to save credentials: $e');
-      showBar('Failed to save credentials');
-    }
-  }*/
-
   void login() {
     if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
       showBar('Please enter username and password');
       return;
     }
+    _loginWithCredentials(usernameController.text, passwordController.text);
+  }
 
+  void _loginWithCredentials(String username, String password) {
     var data = {
       'method': 'POST',
       'route': '/user/login/',
       'payload': {
-        'username': usernameController.text,
-        'password': passwordController.text,
+        'username': username,
+        'password': password,
       }
     };
 
     var jdata = jsonEncode(data) + '\n';
 
     try {
-      print(jdata);
+      print("Sending login data: $jdata");
       channel!.write(jdata);
       channel!.flush();
-      showBar('Sent username/password to Server');
+      showBar('Sent login request to Server');
     } catch (e) {
       showBar('Error: $e');
     }
@@ -189,11 +205,14 @@ class LoginState extends State<Login> {
                   decoration: InputDecoration(
                     labelText: 'Username',
                     hintText: 'Enter your Username',
-                    labelStyle: TextStyle(color: Colors.blue[900], fontSize: 14),
-                    hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
+                    labelStyle:
+                    TextStyle(color: Colors.blue[900], fontSize: 14),
+                    hintStyle:
+                    TextStyle(color: Colors.grey[500], fontSize: 14),
                     prefixIcon: Icon(Icons.person, color: Colors.blue[900]),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                   ),
                 ),
               ),
@@ -217,11 +236,14 @@ class LoginState extends State<Login> {
                   decoration: InputDecoration(
                     labelText: 'Password',
                     hintText: 'Enter your password',
-                    labelStyle: TextStyle(color: Colors.blue[900], fontSize: 14),
-                    hintStyle: TextStyle(color: Colors.grey[500], fontSize: 14),
+                    labelStyle:
+                    TextStyle(color: Colors.blue[900], fontSize: 14),
+                    hintStyle:
+                    TextStyle(color: Colors.grey[500], fontSize: 14),
                     prefixIcon: Icon(Icons.lock, color: Colors.blue[900]),
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    contentPadding:
+                    EdgeInsets.symmetric(horizontal: 20, vertical: 15),
                   ),
                 ),
               ),
