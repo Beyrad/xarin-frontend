@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:untitled1/login.dart';
+import 'package:untitled1/constants.dart';
 
 class ProfilePage extends StatefulWidget {
   ProfilePage({super.key});
@@ -70,7 +71,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void connect(String username, String password) {
-    Socket.connect('192.168.1.104', 8888).then((s) {
+    Socket.connect(host, port).then((s) {
       channel = s;
       showBar('Connected to server');
 
