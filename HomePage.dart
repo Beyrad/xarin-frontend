@@ -207,26 +207,44 @@ class _HomePageState extends State<HomePage> {
       "payload": {"username": _username, "password": _password}
     };
     showBar("Downloading $musicName...");
-    final response = await _sendRequest(request);
 
-    if (response == null ||
-        response['status'] != 200 ||
-        response['base64'] == null) {
-      showBar("Download failed: ${response?['message'] ?? 'Unknown error'}");
-      return;
+    try {
+      final socket = await Socket.connect(host, port,
+          timeout: const Duration(seconds: 5));
+      socket.write(jsonEncode(request) + "\n");
+      await socket.flush();
+
+      final completer = Completer<String>();
+      socket.listen(
+            (data) {
+          final response = utf8.decode(data).trim();
+          completer.complete(response); // treat as raw base64 string
+          socket.destroy();
+        },
+        onError: (error) {
+          showBar("Socket error: $error");
+          completer.completeError(error);
+          socket.destroy();
+        },
+        onDone: () => socket.destroy(),
+      );
+
+      final base64Str = await completer.future;
+      final bytes = base64Decode(base64Str);
+
+      final saveDir = Directory('/storage/emulated/0/Download/xarin_musics/');
+      if (!await saveDir.exists()) await saveDir.create(recursive: true);
+
+      final savedFile = File('${saveDir.path}/$musicName.mp3');
+      await savedFile.writeAsBytes(bytes, flush: true);
+
+      mappings.add({"uuid": uuid, "path": savedFile.path});
+      await dataFile.writeAsString(jsonEncode(mappings), flush: true);
+
+      showBar("$musicName downloaded successfully!");
+    } catch (e) {
+      showBar("Download failed: $e");
     }
-
-    final bytes = base64Decode(response['base64']);
-    final saveDir = Directory('/storage/emulated/0/Download/xarin_musics/');
-    if (!await saveDir.exists()) await saveDir.create(recursive: true);
-
-    final savedFile = File('${saveDir.path}/$musicName.mp3');
-    await savedFile.writeAsBytes(bytes, flush: true);
-
-    mappings.add({"uuid": uuid, "path": savedFile.path});
-    await dataFile.writeAsString(jsonEncode(mappings), flush: true);
-
-    showBar("$musicName downloaded successfully!");
   }
 
   Future<void> _uploadMusic() async {
