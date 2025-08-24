@@ -22,6 +22,9 @@ class _HomePageState extends State<HomePage> {
       {"title": "wercokr9ojeerjg", "artist": "salam", "duration": "7:00"},
       {"title": "werwerewrer", "artist": "reza sadeghi", "duration": "23:01"},
     ],
+    "Likes": [
+      {"title": "like1", "artist": "amin", "duration": "2:01"},
+    ]
   };
 
   String? _username;
@@ -209,28 +212,43 @@ class _HomePageState extends State<HomePage> {
     showBar("Downloading $musicName...");
 
     try {
-      final socket = await Socket.connect(host, port,
-          timeout: const Duration(seconds: 5));
+      final socket = await Socket.connect(host, port);
       socket.write(jsonEncode(request) + "\n");
       await socket.flush();
-
       final completer = Completer<String>();
+      final buffer = StringBuffer();
+
       socket.listen(
             (data) {
-          final response = utf8.decode(data).trim();
-          completer.complete(response); // treat as raw base64 string
-          socket.destroy();
+          buffer.write(utf8.decode(data));
+
+          // check if end marker reached
+          if (buffer.toString().contains("*") && !completer.isCompleted) {
+            completer.complete(buffer.toString().trim());
+            socket.destroy(); // stop reading further
+          }
         },
         onError: (error) {
           showBar("Socket error: $error");
-          completer.completeError(error);
+          if (!completer.isCompleted) completer.completeError(error);
           socket.destroy();
         },
-        onDone: () => socket.destroy(),
       );
 
       final base64Str = await completer.future;
-      final bytes = base64Decode(base64Str);
+      if (base64Str == "E") {
+        showBar("Server returned error!");
+        return;
+      }
+
+      if (!base64Str.startsWith("G") || !base64Str.endsWith("*")) {
+        showBar("Invalid response format!");
+        return;
+      }
+
+      // Extract pure base64 between G and *
+      final pureBase64 = base64Str.substring(1, base64Str.length - 1);
+      final bytes = base64Decode(pureBase64);
 
       final saveDir = Directory('/storage/emulated/0/Download/xarin_musics/');
       if (!await saveDir.exists()) await saveDir.create(recursive: true);
@@ -587,4 +605,4 @@ class PlayMusic extends StatelessWidget {
       ),
     );
   }
-}
+} 
