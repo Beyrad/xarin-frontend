@@ -7,17 +7,23 @@ import 'package:untitled1/profile.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:untitled1/constants.dart';
 import 'package:file_selector/file_selector.dart';
+import 'package:audio_metadata_reader/audio_metadata_reader.dart';
+
+import 'music_player.dart'; // ✅ new
+
 
 class _HomePageState extends State<HomePage> {
-  String selectedPlaylist = "All";
-  List<String> playlists = ["All"];
+  Map<String, dynamic> selectedPlaylist = {'id': 0, 'name': 'All'};
+  List<Map<String, dynamic>> playlists = [
+  ];
+
 
   // Store musicName + uuid internally
   List<Map<String, String>> carouselSongs = [];
 
-  final Map<String, List<Map<String, String>>> playlistSongs = {
+  final Map<String, List<Map<String, dynamic>>> playlistSongs = {
     "All": [
-      {"title": "wefbywefdedsd", "artist": "amin", "duration": "2:31"},
+      {"title": "ali.mp3", "artist": "amin", "duration": "2:31"},
       {"title": "ewewewrŵrewrwrw", "artist": "behnan", "duration": "4:50"},
       {"title": "wercokr9ojeerjg", "artist": "salam", "duration": "7:00"},
       {"title": "werwerewrer", "artist": "reza sadeghi", "duration": "23:01"},
@@ -53,6 +59,7 @@ class _HomePageState extends State<HomePage> {
       _password = creds['password'];
       _requestPlaylists();
       _requestCarouselSongs();
+      _loadAllPlaylistSongs();
     } else {
       showBar("Credentials not found!");
     }
@@ -76,7 +83,90 @@ class _HomePageState extends State<HomePage> {
     }
     return null;
   }
+  String formatDuration(int seconds) {
+    final minutes = (seconds ~/ 60).toString().padLeft(1, '0');
+    final secs = (seconds % 60).toString().padLeft(2, '0');
+    return "$minutes:$secs";
+  }
 
+  Future<void> _loadAllPlaylistSongs() async {
+    if (_username == null || _password == null) return;
+    // Make sure playlists are loaded first
+    if (playlists.isEmpty) await _requestPlaylists();
+    print(playlists.length);
+    for (var playlist in playlists) {
+      final playlistId = playlist['id'].toString();
+      final playlistName = playlist['name'] ?? 'Unknown';
+      print("play list number : ");
+      print(playlistName);
+      final request = {
+        "route": "/playlist/"+ playlistId + "/",
+        "method": "post",
+        "payload": {
+          "username": _username,
+          "password": _password,
+        }
+      };
+
+      final response = await _sendRequest(request);
+      print("wef2");
+      print(response);
+      if (response != null && response['status'] == 200 && response['playlist'] != null) {
+        final playlistData = response['playlist'];
+        final musicsList = playlistData['musics'] as List? ?? [];
+        final file = File(
+            '/storage/emulated/0/Download/xarin/xarin_data.json');
+
+          String content = await file.readAsString();
+          var jsonData = jsonDecode(content) as List;
+          final Map<String, String> uuidToPath = {
+            for (var item in jsonData) item['uuid']: item['path']
+          };
+
+        final musics = await Future.wait(musicsList.map<Future<Map<String, dynamic>>>((audio) async {
+          final fullPath = uuidToPath[audio['id']] ?? "";
+          print("dadash");
+          print(fullPath);
+          String title = audio['musicName'] ?? "Unknown";
+          String artist = audio['authorName'] ?? "Unknown";
+          String durationStr = audio['duration'] != null ? formatDuration(audio['duration']) : "0:00";
+
+          if (fullPath.isNotEmpty) {
+            try {
+              final meta = await readMetadata(File(fullPath));
+              print(meta.title);
+              if (meta.title != null && meta.title!.isNotEmpty) title = meta.title!;
+              if (meta.artist != null && meta.artist!.isNotEmpty) artist = meta.artist!;
+              if (meta.duration != null) durationStr = formatDuration(meta.duration!.inSeconds);
+            } catch (e) {
+              // fallback to server data
+            }
+          }
+          print("finally");
+          print(title);
+          return {
+            "title": title,
+            "artist": artist,
+            "filename": fullPath ?? "",
+            "duration": durationStr,
+            "id": audio['id'] ?? "",
+            "filePath": fullPath,
+            "fileSize": audio['fileSize'] ?? 0,
+          };
+
+        }
+        )
+        );
+        playlistSongs[playlistName] = musics;
+      } else {
+        print("nabayad");
+        playlistSongs[playlistName] = []; // empty if error
+        showBar('Failed to load songs for $playlistName');
+      }
+    }
+
+    setState(() {}); // refresh UI after loading all songs
+  }
   Future<Map<String, dynamic>?> _sendRequest(
       Map<String, dynamic> request) async {
     try {
@@ -131,12 +221,19 @@ class _HomePageState extends State<HomePage> {
     if (response == null) return;
     if (response['status'] == 200 && response['playlists'] != null) {
       final fetchedPlaylists = (response['playlists'] as List)
-          .map<String>((playlist) => playlist['name'] as String)
+          .map<Map<String, dynamic>>((playlist) => {
+        'id': playlist['id'],
+        'name': playlist['name'] as String,
+      })
           .toList();
-
+      print("mast");
+      print(fetchedPlaylists[1]);
       setState(() {
-        playlists =
-        fetchedPlaylists.isNotEmpty ? fetchedPlaylists : ["All", "Likes"];
+        playlists = fetchedPlaylists.isNotEmpty
+            ? fetchedPlaylists
+            : [
+          {'id': 0, 'name': "All"},
+        ];
         selectedPlaylist = playlists.first;
       });
       showBar('Playlists loaded successfully');
@@ -144,6 +241,8 @@ class _HomePageState extends State<HomePage> {
       showBar('Failed to load playlists: ${response['message']}');
     }
   }
+
+
 
   Future<void> _requestCarouselSongs() async {
     if (_username == null || _password == null) return;
@@ -158,7 +257,8 @@ class _HomePageState extends State<HomePage> {
     final response = await _sendRequest(request);
 
     if (response == null) return;
-
+    print("wtf");
+    print(response);
     if (response['status'] == 200 && response['audios'] is List) {
       final fetchedSongs = (response['audios'] as List)
           .where((audio) =>
@@ -285,7 +385,7 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      final saveDir = Directory('/storage/emulated/0/Download/xarin_musics/');
+      final saveDir = Directory('/storage/emulated/0/Download/xarin_musics');
       if (!await saveDir.exists()) await saveDir.create(recursive: true);
 
       final savedFile =
@@ -338,14 +438,18 @@ class _HomePageState extends State<HomePage> {
 
   void _removePlaylist() {}
 
-  void _playMusic(Map<String, String> song) {
+  void _playMusic(List<Map<String, dynamic>> song,int index) {
+    final rotated = [
+      ...song.sublist(index),
+      ...song.sublist(0, index),
+    ];
     Navigator.push(
-        context, MaterialPageRoute(builder: (_) => PlayMusic(song: song)));
+        context, MaterialPageRoute(builder: (_) => MusicPlayerPage(musics: rotated)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentSongs = playlistSongs[selectedPlaylist] ?? [];
+    final currentSongs = playlistSongs[selectedPlaylist['name']] ?? [];
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -433,7 +537,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       child: Center(
                         child: Text(
-                          name,
+                          name['name'],
                           style: TextStyle(
                             color: isSelected ? Colors.white : Colors.blue[900],
                             fontWeight: FontWeight.w600,
@@ -550,7 +654,7 @@ class _HomePageState extends State<HomePage> {
                         itemBuilder: (context, index) {
                           final song = currentSongs[index];
                           return ListTile(
-                            onTap: () => _playMusic(song),
+                            onTap: () => _playMusic(currentSongs, index),
                             leading: CircleAvatar(
                               backgroundColor: Colors.blue[100],
                               child: Icon(Icons.music_note, color: Colors.blue[900]),
@@ -590,7 +694,7 @@ class HomePage extends StatefulWidget {
 }
 
 class PlayMusic extends StatelessWidget {
-  final Map<String, String> song;
+  final Map<String, dynamic> song;
   const PlayMusic({Key? key, required this.song}) : super(key: key);
 
   @override
@@ -605,4 +709,4 @@ class PlayMusic extends StatelessWidget {
       ),
     );
   }
-} 
+}
