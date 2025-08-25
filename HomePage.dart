@@ -42,6 +42,12 @@ class _HomePageState extends State<HomePage> {
     _initUserAndLoad();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadAllPlaylistSongs(); // ✅ refresh on every visit
+  }
+
   void showBar(String text) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -371,6 +377,7 @@ class _HomePageState extends State<HomePage> {
       await dataFile.writeAsString(jsonEncode(mappings), flush: true);
 
       showBar("$musicName downloaded successfully!");
+      await _loadAllPlaylistSongs();
     } catch (e) {
       showBar("Download failed: $e");
     }
@@ -442,6 +449,7 @@ class _HomePageState extends State<HomePage> {
       await dataFile.writeAsString(jsonEncode(mappings), flush: true);
 
       showBar("Upload successful!");
+      await _loadAllPlaylistSongs();
     } catch (e) {
       showBar("Error picking or uploading file: $e");
     }
