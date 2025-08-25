@@ -26,13 +26,13 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void showBar(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
+   /* ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(text),
         backgroundColor: Colors.blue[900],
         duration: const Duration(seconds: 3),
       ),
-    );
+    );*/
   }
 
   /// Check if credentials.json exists
