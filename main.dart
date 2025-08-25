@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:r/login.dart';
+import 'package:untitled1/HomePage.dart';
+import 'package:untitled1/login.dart';
+import 'package:untitled1/main_page.dart';
+import 'package:untitled1/music_player.dart';
+import 'package:untitled1/profile.dart';
+import 'package:untitled1/constants.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
+  MyApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Login(),
+      debugShowCheckedModeBanner: false,
+      home : Login()
     );
   }
 }
