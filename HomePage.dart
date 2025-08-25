@@ -9,7 +9,7 @@ import 'package:untitled1/constants.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 
-import 'music_player.dart'; // ✅ new
+import 'music_player.dart'; 
 
 
 class _HomePageState extends State<HomePage> {
@@ -41,17 +41,17 @@ class _HomePageState extends State<HomePage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _loadAllPlaylistSongs(); // ✅ refresh on every visit
+    _loadAllPlaylistSongs(); 
   }
 
   void showBar(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
+    /*ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(text),
         backgroundColor: Colors.blue[900],
         duration: const Duration(seconds: 2),
       ),
-    );
+    );*/
   }
 
   Future<void> _initUserAndLoad() async {
@@ -214,7 +214,6 @@ class _HomePageState extends State<HomePage> {
     if (choice == null) return;
 
     if (choice == "add") {
-      // 👉 show playlist picker
       final targetPlaylist = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -746,6 +745,7 @@ class _HomePageState extends State<HomePage> {
                           onTap: () {
                             setState(() {
                               selectedPlaylist = name;
+                              _loadAllPlaylistSongs();
                             });
                           },
                           child: Container(
