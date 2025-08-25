@@ -1,10 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:untitled1/login.dart';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:audio_metadata_reader/audio_metadata_reader.dart'; // ✅ new
+import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 import 'package:untitled1/constants.dart';
 
 // import profile.dart to access getCredentials
@@ -21,13 +22,13 @@ class MusicPlayerPage extends StatefulWidget {
 
 class _MusicPlayerPageState extends State<MusicPlayerPage> {
   void showBar(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(text),
-        backgroundColor: Colors.blue[900],
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    // ScaffoldMessenger.of(context).showSnackBar(
+    //   SnackBar(
+    //     content: Text(text),
+    //     backgroundColor: Colors.blue[900],
+    //     duration: const Duration(seconds: 3),
+    //   ),
+    // );
   }
 
   Socket? channel;
@@ -40,8 +41,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
   bool _isLiked = false;
   bool _hasPermission = false;
 
-  // ✅ metadata state
+  // metadata state
   String _trackTitle = "";
+  Uint8List? _albumArt; // embedded cover bytes (if any)
 
   @override
   void initState() {
@@ -53,7 +55,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
   Future<void> _checkPermissionAndLoad() async {
     _hasPermission = await _requestAudioPermission();
     if (!_hasPermission) return;
-
     await _loadMusic();
   }
 
@@ -61,18 +62,14 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     if (await Permission.audio.isGranted) return true;
     if (await Permission.storage.isGranted) return true;
 
-    var statuses = await [
-      Permission.audio,
-      Permission.storage,
-    ].request();
+    final statuses = await [Permission.audio, Permission.storage].request();
 
     return statuses[Permission.audio]?.isGranted == true ||
         statuses[Permission.storage]?.isGranted == true;
   }
 
   Future<void> is_liked(String musicId) async {
-    final directory =
-    Directory('/storage/emulated/0/Download/xarin_credentials');
+    final directory = Directory('/storage/emulated/0/Download/xarin_credentials');
     final file = File('${directory.path}/credentials.json');
 
     if (await file.exists()) {
@@ -113,7 +110,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
               },
             );
 
-            var req = {
+            final req = {
               'method': 'POST',
               'route': '/is_liked/',
               'payload': {
@@ -123,7 +120,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
               }
             };
 
-            var jdata = jsonEncode(req) + '\n';
+            final jdata = jsonEncode(req) + '\n';
             channel!.write(jdata);
             channel!.flush();
           }).catchError((e) {
@@ -148,13 +145,26 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       final music = widget.musics[_currentIndex];
       final musicId_ = music['id'] as String;
 
-      // ✅ load metadata
-      final meta = await readMetadata(File(fullPath));
+      // clear old art while loading a new track
       setState(() {
-        _trackTitle = meta.title ?? filename.replaceAll('.mp3', '');
+        _albumArt = null;
       });
 
-      is_liked(musicId_);
+      // Read metadata (including embedded images)
+      final meta = readMetadata(File(fullPath), getImage: true); 
+      Uint8List? artBytes;
+      if (meta.pictures.isNotEmpty) {
+        // Prefer the "front cover" if present
+        final front = meta.pictures.where((p) => p.pictureType == PictureType.coverFront);
+        artBytes = (front.isNotEmpty ? front.first : meta.pictures.first).bytes;
+      }
+
+      setState(() {
+        _trackTitle = meta.title ?? filename.replaceAll('.mp3', '');
+        _albumArt = artBytes;
+      });
+
+      await is_liked(musicId_);
       await _player.setFilePath(fullPath);
       setState(() => _isPlaying = false);
     } catch (e) {
@@ -207,7 +217,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
 
       channel!.listen(
             (data) {
-          var response = utf8.decode(data).trim();
+          final response = utf8.decode(data).trim();
           print('Received wef: $response');
         },
         onError: (error) {
@@ -219,7 +229,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
         },
       );
 
-      // Fetch user data with credentials
       add_to_play_list(playlist, id);
     }).catchError((e) {
       showBar('Failed to connect to socket: $e');
@@ -227,9 +236,11 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
   }
 
   void add_to_play_list(int playlist, String id) {
-    var data = {
+    final data = {
       'method': 'POST',
-      'route': _isLiked ? '/playlist/' + playlist.toString() + '/remove/' : '/playlist/' + playlist.toString() + '/add/',
+      'route': _isLiked
+          ? '/playlist/${playlist.toString()}/remove/'
+          : '/playlist/${playlist.toString()}/add/',
       'payload': {
         'username': username,
         'password': password,
@@ -237,7 +248,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       }
     };
 
-    var jdata = jsonEncode(data) + '\n';
+    final jdata = jsonEncode(data) + '\n';
 
     try {
       print("Sending: $jdata");
@@ -248,7 +259,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     }
   }
 
-  // ---------------- NEW CODE ----------------
   Future<void> like(String musicId) async {
     final directory = Directory('/storage/emulated/0/Download/xarin_credentials');
     final file = File('${directory.path}/credentials.json');
@@ -273,9 +283,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
     } else {
       _redirectToLogin();
     }
-
   }
-  // ------------------------------------------
 
   @override
   void dispose() {
@@ -313,7 +321,6 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       appBar: AppBar(
         title: Text(
           _trackTitle.isNotEmpty ? _trackTitle : music['filename'],
-          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.blue[900],
@@ -321,6 +328,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Cover art (embedded) or placeholder
           Container(
             height: 250,
             width: 250,
@@ -328,8 +336,9 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
               borderRadius: BorderRadius.circular(20),
               color: Colors.deepPurple.shade100,
               image: DecorationImage(
-                image: const AssetImage("assets/cover_placeholder.png")
-                as ImageProvider,
+                image: _albumArt != null
+                    ? MemoryImage(_albumArt!)
+                    : const AssetImage("assets/cover_placeholder.png") as ImageProvider,
                 fit: BoxFit.cover,
               ),
             ),
@@ -401,8 +410,10 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
           const SizedBox(height: 30),
 
           ElevatedButton.icon(
-            icon: Icon(Icons.favorite,
-                color: _isLiked ? Colors.red : Colors.grey),
+            icon: Icon(
+              Icons.favorite,
+              color: _isLiked ? Colors.red : Colors.grey,
+            ),
             label: _isLiked ? const Text('liked') : const Text('like'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.blue[900],
@@ -411,7 +422,7 @@ class _MusicPlayerPageState extends State<MusicPlayerPage> {
             onPressed: () {
               final musicId = music['id'] as String;
               like(musicId);
-              sleep(Duration(milliseconds: 200));
+              sleep(const Duration(milliseconds: 200)); // consider replacing with Future.delayed
               is_liked(musicId);
             },
           ),
