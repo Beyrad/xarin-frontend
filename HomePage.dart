@@ -117,7 +117,7 @@ class _HomePageState extends State<HomePage> {
       print("play list number : ");
       print(playlistName);
       final request = {
-        "route": "/playlist/"+ playlistId + "/",
+        "route": "/playlist/" + playlistId + "/",
         "method": "post",
         "payload": {
           "username": _username,
@@ -128,7 +128,8 @@ class _HomePageState extends State<HomePage> {
       final response = await _sendRequest(request);
       print("wef2");
       print(response);
-      if (response != null && response['status'] == 200 && response['playlist'] != null) {
+      if (response != null && response['status'] == 200 &&
+          response['playlist'] != null) {
         final playlistData = response['playlist'];
         final musicsList = playlistData['musics'] as List? ?? [];
         final file = File(
@@ -140,39 +141,43 @@ class _HomePageState extends State<HomePage> {
           for (var item in jsonData) item['uuid']: item['path']
         };
 
-        final musics = await Future.wait(musicsList.map<Future<Map<String, dynamic>>>((audio) async {
-          final fullPath = uuidToPath[audio['id']] ?? "";
-          print("dadash");
-          print(fullPath);
-          String title = audio['musicName'] ?? "Unknown";
-          String artist = audio['authorName'] ?? "Unknown";
-          String durationStr = audio['duration'] != null ? formatDuration(audio['duration']) : "0:00";
+        final musics = await Future.wait(
+            musicsList.map<Future<Map<String, dynamic>>>((audio) async {
+              final fullPath = uuidToPath[audio['id']] ?? "";
+              print("dadash");
+              print(fullPath);
+              String title = audio['musicName'] ?? "Unknown";
+              String artist = audio['authorName'] ?? "Unknown";
+              String durationStr = audio['duration'] != null ? formatDuration(
+                  audio['duration']) : "0:00";
 
-          if (fullPath.isNotEmpty) {
-            try {
-              final meta = await readMetadata(File(fullPath));
-              print(meta.title);
-              if (meta.title != null && meta.title!.isNotEmpty) title = meta.title!;
-              if (meta.artist != null && meta.artist!.isNotEmpty) artist = meta.artist!;
-              if (meta.duration != null) durationStr = formatDuration(meta.duration!.inSeconds);
-            } catch (e) {
-              // fallback to server data
+              if (fullPath.isNotEmpty) {
+                try {
+                  final meta = await readMetadata(File(fullPath));
+                  print(meta.title);
+                  if (meta.title != null && meta.title!.isNotEmpty)
+                    title = meta.title!;
+                  if (meta.artist != null && meta.artist!.isNotEmpty)
+                    artist = meta.artist!;
+                  if (meta.duration != null)
+                    durationStr = formatDuration(meta.duration!.inSeconds);
+                } catch (e) {
+                  // fallback to server data
+                }
+              }
+              print("finally");
+              print(title);
+              return {
+                "title": title,
+                "artist": artist,
+                "filename": fullPath ?? "",
+                "duration": durationStr,
+                "id": audio['id'] ?? "",
+                "filePath": fullPath,
+                "fileSize": audio['fileSize'] ?? 0,
+              };
             }
-          }
-          print("finally");
-          print(title);
-          return {
-            "title": title,
-            "artist": artist,
-            "filename": fullPath ?? "",
-            "duration": durationStr,
-            "id": audio['id'] ?? "",
-            "filePath": fullPath,
-            "fileSize": audio['fileSize'] ?? 0,
-          };
-
-        }
-        )
+            )
         );
         playlistSongs[playlistName] = musics;
       } else {
@@ -181,9 +186,98 @@ class _HomePageState extends State<HomePage> {
         showBar('Failed to load songs for $playlistName');
       }
     }
-
-    setState(() {}); // refresh UI after loading all songs
   }
+
+  Future<void> _onSongOptions(Map<String, dynamic> song) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.playlist_add, color: Colors.green),
+              title: const Text("Add to Playlist"),
+              onTap: () => Navigator.pop(ctx, "add"),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text("Remove from Playlist"),
+              onTap: () => Navigator.pop(ctx, "remove"),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (choice == null) return;
+
+    if (choice == "add") {
+      // 👉 show playlist picker
+      final targetPlaylist = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text("Select Playlist"),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: playlists.length,
+              itemBuilder: (c, i) {
+                final pl = playlists[i];
+                return ListTile(
+                  title: Text(pl['name']),
+                  onTap: () => Navigator.pop(ctx, pl),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      if (targetPlaylist == null) return;
+
+      final request = {
+        "route": "/playlist/${targetPlaylist['id']}/add/",
+        "method": "post",
+        "payload": {
+          "username": _username,
+          "password": _password,
+          "uuid": song['id'], // uuid of selected song
+        }
+      };
+
+      final res = await _sendRequest(request);
+      if (res != null && res['status'] == 200) {
+        showBar("Added to ${targetPlaylist['name']}");
+        await _loadAllPlaylistSongs();
+      } else {
+        showBar("Failed to add: ${res?['message']}");
+      }
+    }
+
+    if (choice == "remove") {
+      final request = {
+        "route": "/playlist/${selectedPlaylist['id']}/remove/",
+        "method": "post",
+        "payload": {
+          "username": _username,
+          "password": _password,
+          "uuid": song['id'], // uuid of selected song
+        }
+      };
+
+      final res = await _sendRequest(request);
+      if (res != null && res['status'] == 200) {
+        showBar("Removed from ${selectedPlaylist['name']}");
+        await _loadAllPlaylistSongs();
+      } else {
+        showBar("Failed to remove: ${res?['message']}");
+      }
+    }
+  }
+
+
+
   Future<Map<String, dynamic>?> _sendRequest(
       Map<String, dynamic> request) async {
     try {
@@ -383,6 +477,112 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _addPlaylistDialog() async {
+    final controller = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("New Playlist"),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: "Enter playlist name",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isEmpty) {
+                showBar("Playlist name cannot be empty");
+                return;
+              }
+              Navigator.pop(ctx); // close dialog
+
+              final request = {
+                "route": "/playlist/add/",
+                "method": "post",
+                "payload": {
+                  "username": _username,
+                  "password": _password,
+                  "name": name, // ✅ send playlist name too
+                  "maxSize": 30
+                }
+              };
+
+              final response = await _sendRequest(request);
+              if (response != null && response['status'] == 201) {
+                setState(() {
+                  playlists.add({'id': playlists.length + 1, 'name': name});
+                });
+                showBar("Playlist created: $name");
+              } else {
+                showBar("Failed to create playlist: ${response?['message']}");
+              }
+            },
+            child: const Text("Add"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _removePlaylist() async {
+    if (selectedPlaylist['id'] == 0) {
+      showBar("Cannot remove default playlist");
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Remove Playlist"),
+        content: Text("Are you sure you want to remove '${selectedPlaylist['name']}'?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("Remove"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    final request = {
+      "route": "/playlist/remove/",
+      "method": "post",
+      "payload": {
+        "username": _username,
+        "password": _password,
+        "id": selectedPlaylist['id'],
+      }
+    };
+
+    final response = await _sendRequest(request);
+    if (response != null && response['status'] == 200) {
+      setState(() {
+        playlists.removeWhere((p) => p['id'] == selectedPlaylist['id']);
+        selectedPlaylist = playlists.isNotEmpty ? playlists.first : {'id': 0, 'name': 'All'};
+      });
+      showBar("Removed the playlist!");
+    } else {
+      showBar("Failed to remove: ${response?['message']}");
+    }
+  }
+
+
   Future<void> _uploadMusic() async {
     if (_username == null || _password == null) {
       showBar("Missing credentials");
@@ -455,7 +655,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _removePlaylist() {}
 
   void _playMusic(List<Map<String, dynamic>> song,int index) {
     final rotated = [
@@ -524,48 +723,57 @@ class _HomePageState extends State<HomePage> {
           children: [
             SizedBox(
               height: 45,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: playlists.length,
-                itemBuilder: (context, index) {
-                  final name = playlists[index];
-                  final isSelected = name == selectedPlaylist;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        selectedPlaylist = name;
-                      });
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 6),
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: isSelected ? Colors.blue[900] : Colors.white,
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(color: Colors.blue[900]!),
-                        boxShadow: isSelected
-                            ? [
-                          BoxShadow(
-                            color: Colors.blue.shade200,
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          )
-                        ]
-                            : [],
-                      ),
-                      child: Center(
-                        child: Text(
-                          name['name'],
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.blue[900],
-                            fontWeight: FontWeight.w600,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: playlists.length,
+                      itemBuilder: (context, index) {
+                        final name = playlists[index];
+                        final isSelected = name == selectedPlaylist;
+                        return GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              selectedPlaylist = name;
+                            });
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.blue[900] : Colors.white,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: Colors.blue[900]!),
+                              boxShadow: isSelected
+                                  ? [
+                                BoxShadow(
+                                  color: Colors.blue.shade200,
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                )
+                              ]
+                                  : [],
+                            ),
+                            child: Center(
+                              child: Text(
+                                name['name'],
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.blue[900],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
-                  );
-                },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle, color: Colors.green, size: 30),
+                    onPressed: _addPlaylistDialog,
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 20),
@@ -658,7 +866,7 @@ class _HomePageState extends State<HomePage> {
                       child: IconButton(
                         icon: Icon(Icons.remove_circle,
                             color: Colors.red[700], size: 28),
-                        onPressed: _removePlaylist,
+                        onPressed: _removePlaylist, // ✅ hook it up
                       ),
                     ),
                     Expanded(
@@ -686,10 +894,19 @@ class _HomePageState extends State<HomePage> {
                             ),
                             subtitle: Text(song["artist"]!,
                                 style: TextStyle(color: Colors.grey[600])),
-                            trailing: Text(song["duration"]!,
-                                style: TextStyle(
-                                    color: Colors.blue[900],
-                                    fontWeight: FontWeight.w500)),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(song["duration"]!,
+                                    style: TextStyle(
+                                        color: Colors.blue[900],
+                                        fontWeight: FontWeight.w500)),
+                                IconButton(
+                                  icon: const Icon(Icons.more_vert, color: Colors.grey),
+                                  onPressed: () => _onSongOptions(song),
+                                ),
+                              ],
+                            ),
                           );
                         },
                       ),
