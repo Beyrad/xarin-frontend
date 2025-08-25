@@ -23,13 +23,9 @@ class _HomePageState extends State<HomePage> {
 
   final Map<String, List<Map<String, dynamic>>> playlistSongs = {
     "All": [
-      {"title": "ali.mp3", "artist": "amin", "duration": "2:31"},
-      {"title": "ewewewrŵrewrwrw", "artist": "behnan", "duration": "4:50"},
-      {"title": "wercokr9ojeerjg", "artist": "salam", "duration": "7:00"},
-      {"title": "werwerewrer", "artist": "reza sadeghi", "duration": "23:01"},
+
     ],
     "Likes": [
-      {"title": "like1", "artist": "amin", "duration": "2:01"},
     ]
   };
 
@@ -72,8 +68,9 @@ class _HomePageState extends State<HomePage> {
       }
 
       _requestPlaylists();
-      _requestCarouselSongs();
       _loadAllPlaylistSongs();
+      _requestCarouselSongs();
+
     } else {
       showBar("Credentials not found!");
     }
@@ -179,10 +176,15 @@ class _HomePageState extends State<HomePage> {
             }
             )
         );
-        playlistSongs[playlistName] = musics;
+        setState(() {
+          playlistSongs[playlistName] = musics;
+        });
       } else {
         print("nabayad");
-        playlistSongs[playlistName] = []; // empty if error
+        setState(() {
+          playlistSongs[playlistName] = []; // empty if error
+        });
+
         showBar('Failed to load songs for $playlistName');
       }
     }
@@ -471,7 +473,9 @@ class _HomePageState extends State<HomePage> {
       await dataFile.writeAsString(jsonEncode(mappings), flush: true);
 
       showBar("$musicName downloaded successfully!");
-      await _loadAllPlaylistSongs();
+      setState(() {
+        _loadAllPlaylistSongs();
+      });
     } catch (e) {
       showBar("Download failed: $e");
     }
@@ -520,6 +524,7 @@ class _HomePageState extends State<HomePage> {
               if (response != null && response['status'] == 201) {
                 setState(() {
                   playlists.add({'id': playlists.length + 1, 'name': name});
+                  _requestPlaylists();
                 });
                 showBar("Playlist created: $name");
               } else {
@@ -534,7 +539,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _removePlaylist() async {
-    if (selectedPlaylist['id'] == 0) {
+    if (selectedPlaylist['id'] == 0 || selectedPlaylist['id'] == 1) {
       showBar("Cannot remove default playlist");
       return;
     }
@@ -559,7 +564,9 @@ class _HomePageState extends State<HomePage> {
     );
 
     if (confirm != true) return;
-
+    print("wayyyyy");
+    print(selectedPlaylist['id']);
+    print(selectedPlaylist['name']);
     final request = {
       "route": "/playlist/remove/",
       "method": "post",
@@ -574,6 +581,7 @@ class _HomePageState extends State<HomePage> {
     if (response != null && response['status'] == 200) {
       setState(() {
         playlists.removeWhere((p) => p['id'] == selectedPlaylist['id']);
+        _requestPlaylists();
         selectedPlaylist = playlists.isNotEmpty ? playlists.first : {'id': 0, 'name': 'All'};
       });
       showBar("Removed the playlist!");
@@ -649,7 +657,9 @@ class _HomePageState extends State<HomePage> {
       await dataFile.writeAsString(jsonEncode(mappings), flush: true);
 
       showBar("Upload successful!");
-      await _loadAllPlaylistSongs();
+      setState(() {
+        _loadAllPlaylistSongs();
+      });
     } catch (e) {
       showBar("Error picking or uploading file: $e");
     }
