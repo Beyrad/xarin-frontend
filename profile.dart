@@ -108,7 +108,8 @@ class _ProfilePageState extends State<ProfilePage> {
     };
 
     var jdata = jsonEncode(data) + '\n';
-
+    print("alo");
+    print(jdata);
     try {
       print("Sending: $jdata");
       channel!.write(jdata);
@@ -146,6 +147,13 @@ class _ProfilePageState extends State<ProfilePage> {
         await file.delete();
         showBar("Credentials deleted");
       }
+
+      final js = File('/storage/emulated/0/Download/xarin/xarin_data.json');
+      if (await js.exists()) {
+        await js.delete();
+        showBar("json file deleted");
+      }
+
     } catch (e) {
       showBar("Error deleting credentials: $e");
     }
