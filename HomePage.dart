@@ -57,12 +57,23 @@ class _HomePageState extends State<HomePage> {
     if (creds != null) {
       _username = creds['username'];
       _password = creds['password'];
+
+      final file = File(
+          '/storage/emulated/0/Download/xarin/xarin_data.json');
+      if (!await file.exists()) {
+        await file.create(recursive: true);
+        await file.writeAsString(jsonEncode([]), flush: true);
+      }
+
       _requestPlaylists();
       _requestCarouselSongs();
       _loadAllPlaylistSongs();
     } else {
       showBar("Credentials not found!");
     }
+
+
+
   }
 
   Future<Map<String, String>?> _loadCredentials() async {
@@ -107,7 +118,7 @@ class _HomePageState extends State<HomePage> {
           "password": _password,
         }
       };
-
+      print(playlistId);
       final response = await _sendRequest(request);
       print("wef2");
       print(response);
@@ -117,11 +128,11 @@ class _HomePageState extends State<HomePage> {
         final file = File(
             '/storage/emulated/0/Download/xarin/xarin_data.json');
 
-          String content = await file.readAsString();
-          var jsonData = jsonDecode(content) as List;
-          final Map<String, String> uuidToPath = {
-            for (var item in jsonData) item['uuid']: item['path']
-          };
+        String content = await file.readAsString();
+        var jsonData = jsonDecode(content) as List;
+        final Map<String, String> uuidToPath = {
+          for (var item in jsonData) item['uuid']: item['path']
+        };
 
         final musics = await Future.wait(musicsList.map<Future<Map<String, dynamic>>>((audio) async {
           final fullPath = uuidToPath[audio['id']] ?? "";
