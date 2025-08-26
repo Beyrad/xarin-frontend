@@ -44,6 +44,14 @@ cd xarin-music-player
 ```
 
 ### 3. Install Dependencies
+  cupertino_icons: ^1.0.8
+  web_socket_channel: ^3.0.1
+  just_audio: ^0.9.42
+  audio_session: ^0.1.13
+  permission_handler: ^12.0.1
+  audio_metadata_reader: ^1.4.2
+  carousel_slider: ^5.1.1
+  file_selector: ^1.0.3
 ```bash
 flutter pub get
 ```
