@@ -27,12 +27,12 @@ class RegisterState extends State<Register> {
   }
 
   void showBar(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(text),
-        backgroundColor: Colors.blue[900],
-        duration: const Duration(seconds: 3),
-      ),
+     ScaffoldMessenger.of(context).showSnackBar(
+       SnackBar(
+         content: Text(text),
+         backgroundColor: Colors.blue[900],
+         duration: const Duration(seconds: 3),
+       ),
     );
   }
 
@@ -44,8 +44,18 @@ class RegisterState extends State<Register> {
       channel!.listen(
             (data) {
           var response = utf8.decode(data).trim();
-          showBar('Server response: $response');
-          print('Received: $response');
+          var jsonResponse = jsonDecode(response);
+          if(jsonResponse['status'] == 201){
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => Login()),
+              );
+            });
+          }
+          var res = jsonResponse['message'];
+          showBar('Server response: $res');
+          print('Received: $response ');
         },
         onError: (error) {
           showBar('Socket error: $error');
