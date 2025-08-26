@@ -1,6 +1,6 @@
 # 🎵 Xarin Music Player
 
-A modern **Flutter music player app** with login, playlists, and offline support.  
+A modern **Flutter music player app**.
 Built with **Flutter**, designed for simplicity, and packed with features like metadata reading, album art display, and playlist management.  
 
 ---
@@ -18,6 +18,15 @@ Built with **Flutter**, designed for simplicity, and packed with features like m
 ---
 
 ## 📸 Screenshots
+<img width="591" height="1280" alt="image" src="https://github.com/user-attachments/assets/cd05a346-b4bd-4e69-ab89-4ede00888f9a" />
+<img width="591" height="1280" alt="image" src="https://github.com/user-attachments/assets/100e2a09-f24a-4619-bd41-60e414e383c8" />
+<img width="591" height="1280" alt="image" src="https://github.com/user-attachments/assets/706d3daf-9de6-4d74-8197-90361e37a6a5" />
+<img width="591" height="1280" alt="image" src="https://github.com/user-attachments/assets/99f79d3b-f17b-4557-81a9-2e4dcfc967cd" />
+<img width="591" height="1280" alt="image" src="https://github.com/user-attachments/assets/bf010c15-71f0-4f34-ad3e-68cf3f8bd37e" />
+<img width="591" height="1280" alt="image" src="https://github.com/user-attachments/assets/e029aaf0-017e-4a08-91f2-d9db8a7846a4" />
+<img width="591" height="1280" alt="image" src="https://github.com/user-attachments/assets/47da5efd-fb3a-4823-994d-a21d3d61e043" />
+<img width="591" height="1280" alt="image" src="https://github.com/user-attachments/assets/422de100-cb10-4121-bd92-d048f7078df6" />
+
 
 ---
 
@@ -51,10 +60,11 @@ flutter run
 lib/
  ├── main.dart              # Entry point
  ├── login.dart             # Login screen
+ ├── register.dart          # Registeration page
  ├── profile.dart           # Credentials handling
  ├── constants.dart         # Global constants
  ├── music_player.dart      # Music player UI
- ├── home.dart              # Homepage with playlists
+ ├── HomePage.dart          # Homepage with playlists
  └── widgets/               # Reusable widgets
 ```
 
